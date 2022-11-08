@@ -1,0 +1,8 @@
+insert into audit_usecase2.audit_usecase2_history
+select 
+'usecase_2.usecase2_history' as table_name,
+'623434' as user_name,
+current_timestamp() as last_ingested_time,
+DATE_ADD(current_timestamp(), INTERVAL 1 DAY) as next_ingested_time,
+count(*) as total_record_count
+from usecase_2.usecase2_history;
