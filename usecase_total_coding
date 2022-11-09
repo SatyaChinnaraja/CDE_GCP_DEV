@@ -1,0 +1,133 @@
+---creating bucket---
+
+gsutil mb -l us -c standard gs://pcm_cards_usecase4
+
+---bucket loading
+
+gsutil cp -r C:\use_case_batch9\de_batch_9\Sample_usecase_emp\use_case4.csv gs://pcm_cards_usecase4 
+
+
+---stage dataset and table 
+
+ create table pcd_usecase4_stage.pcd_stage_table(
+ cust_id	string,
+first_name	string,
+last_name	string,
+gender	string,
+ip_address	string,
+mac_id	string,
+client_name	string,
+mail_id	string,
+url_	string,
+app_name	string,
+ph_number	string,
+credit_card_band	string,
+card_isu_date	string,
+cur_code	string,
+stock_sym	string,
+valid_card	string,
+card_type	string,
+currency_code	string,
+access_code	string,
+guid	string,
+stock_sym_20	string,
+emp_role	string)
+
+--loading stage TABLE---
+
+bq load --source_format=CSV --skip_leading_rows=1 pcd_usecase4_stage.pcd_stage_table gs://pcm_cards_usecase4/use_case4.csv
+
+
+---creating audit dataset and table -----
+create table pcd_usecase4_audit.pcd_audit_table(
+  table_name string,
+  user_name string,
+  last_injected_time timestamp,
+  next_injected_time timestamp,
+  total_count int64)
+  
+  ---inserting stage loading details
+  
+    insert into pcd_usecase4_audit.pcd_audit_table select
+  'pcd_usecase4_stage.pcd_stage_table',
+  'satya',
+  current_timestamp(),
+  date_add(current_timestamp(),interval 1 day),
+  count(*) from pcd_usecase4_stage.pcd_stage_table
+  
+ ---- inserting history loading details
+  insert into pcd_usecase4_audit.pcd_audit_table select
+  'pcd_usecase4_history.pcd_history_table',
+  'satya',
+  current_timestamp(),
+  date_add(current_timestamp(),interval 1 day),
+  count(*) from pcd_usecase4_history.pcd_history_table
+  
+  
+  
+  ---creating history dataset and table 
+  
+create table pcd_usecase4_history.pcd_history_table(
+cust_id	bytes,
+first_name	string,
+last_name	string,
+gender	string,
+ip_address	string,
+mac_id	string,
+client_name	string,
+mail_id	bytes,
+url_	string,
+app_name	string,
+ph_number	bignumeric,
+credit_card_band	string,
+card_isu_date	date,
+cur_code	string,
+stock_sym	string,
+valid_card	bool,
+card_type	string,
+currency_code	string,
+access_code	string,
+guid	string,
+stock_sym_20	string,
+emp_role	string)
+
+----history table loading
+
+insert into pcd_usecase4_history.pcd_history_table select 
+sha256(cust_id) ,
+first_name,
+	last_name	,
+	gender	,
+	ip_address	,
+	mac_id	,
+regexp_extract(client_name,"^[a-zA-Z0-9]+"),
+md5(mail_id),
+split(split(url_,"//")[offset(1)],"/")[offset(0)] ,
+	app_name	,
+safe_cast((lpad(ph_number,14,"+91 ")) as 	bignumeric),
+	credit_card_band	,
+safe_cast(	(CASE WHEN safe.parse_DATE("%m-%d-%Y",card_isu_date) is null
+ then safe.parse_DATE("%m/%d/%Y",card_isu_date) 
+ when safe.parse_DATE("%m-%d-%Y",card_isu_date) is null
+ then  safe.parse_DATE("%d/%m/%Y",card_isu_date)
+else safe.parse_DATE("%m-%d-%Y",card_isu_date)
+end)	as date),
+	cur_code	,
+	stock_sym	,
+safe_cast((case when valid_card = 'TRUE' and card_type != 'null' then valid_card='TRUE' 
+else valid_card='False'
+end) as bool) ,
+	card_type	,
+	currency_code	,
+	access_code,
+	guid	,
+	stock_sym_20	,
+	emp_role	from pcd_usecase4_stage.pcd_stage_table
+
+
+
+  
+  
+  
+  
+
